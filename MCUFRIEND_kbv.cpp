@@ -1968,19 +1968,19 @@ case 0x4532:    // thanks Leodino
 	  common_9481:
         static const uint8_t ILI9481_regValues[] PROGMEM = {    // Atmel MaxTouch
             0xB0, 1, 0x00,              // unlocks E0, F0
-            0xB3, 4, 0x02, 0x00, 0x00, 0x00, //Frame Memory, interface [02 00 00 00]
-			0xB4, 1, 0x00,              // Frame mode [00]
+//            0xB3, 4, 0x02, 0x00, 0x00, 0x00, //Frame Memory, interface [02 00 00 00]
+//			0xB4, 1, 0x00,              // Frame mode [00]
 			0xD0, 3, 0x07, 0x42, 0x18,  // Set Power [00 43 18] x1.00, x6, x3
             0xD1, 3, 0x00, 0x07, 0x10,  // Set VCOM  [00 00 00] x0.72, x1.02
             0xD2, 2, 0x01, 0x02,        // Set Power for Normal Mode [01 22]
             0xD3, 2, 0x01, 0x02,        // Set Power for Partial Mode [01 22]
             0xD4, 2, 0x01, 0x02,        // Set Power for Idle Mode [01 22]
             0xC0, 5, 0x10, 0x3B, 0x00, 0x02, 0x11,      //Set Panel Driving [10 3B 00 02 11]
-            0xC1, 3, 0x10, 0x10, 0x88,  // Display Timing Normal [10 10 88]
-			0xC5, 1, 0x03,      //Frame Rate [03]
-			0xC6, 1, 0x02,      //Interface Control [02]
+//            0xC1, 3, 0x10, 0x10, 0x88,  // Display Timing Normal [10 10 88]
+//			0xC5, 1, 0x03,      //Frame Rate [03]
+//			0xC6, 1, 0x02,      //Interface Control [02]
             0xC8, 12, 0x00, 0x32, 0x36, 0x45, 0x06, 0x16, 0x37, 0x75, 0x77, 0x54, 0x0C, 0x00,
-			0xCC, 1, 0x00,      //Panel Control [00]
+//			0xCC, 1, 0x00,      //Panel Control [00]
         };
         static const uint8_t ILI9481_CPT29_regValues[] PROGMEM = {    // 320x430
             0xB0, 1, 0x00,
