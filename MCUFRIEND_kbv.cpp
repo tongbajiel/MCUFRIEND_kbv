@@ -26,6 +26,23 @@
 #include "utility/mcufriend_shield.h"
 #endif
 
+#define USE_XOR
+#ifdef USE_XOR
+#define FLIP_VERT       (1<<0)
+#define FLIP_HORIZ      (1<<1)
+#define INVERT_RGB      (1<<3)
+#define MV_AXIS         (1<<5)
+#define INVERT_SS       (1<<6)
+#define INVERT_GS       (1<<7)
+#define MIPI_DCS_REV1   (1<<8)
+#define REV_SCREEN      (1<<9)
+#define XSA_XEA_16BIT   (1<<10)
+#define AUTO_READINC    (1<<11)
+#define READ_BGR        (1<<12)
+#define READ_LOWHIGH    (1<<13)
+#define READ_24BITS     (1<<14)
+#define READ_NODUMMY    (1<<15)
+#else 
 #define MIPI_DCS_REV1   (1<<0)
 #define AUTO_READINC    (1<<1)
 #define READ_BGR        (1<<2)
@@ -40,6 +57,7 @@
 #define REV_SCREEN      (1<<12)
 #define FLIP_VERT       (1<<13)
 #define FLIP_HORIZ      (1<<14)
+#endif
 
 #if (defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1280__) || defined(__SAM3X8E__))\
  && (defined(USE_MEGA_16BIT_SHIELD) || defined(USE_DUE_16BIT_SHIELD))
@@ -212,7 +230,7 @@ uint16_t MCUFRIEND_kbv::readID(void)
         return 0x1520;
     if (ret == 0x1526)          //?R61526: [xx 01 22 15 26]
         return 0x1526;
-    if (ret == 0x1581)          //R61581:  [xx 01 22 15 81]
+    if (ret == 0x1581 || ret == 0x1783)          //R61581:  [xx 01 22 15 81]
         return 0x1581;
     if (ret == 0x1400)          //?RM68140:[xx FF 68 14 00] not tested yet
         return 0x6814;
@@ -341,6 +359,41 @@ void MCUFRIEND_kbv::setRotation(uint8_t r)
         val = 0xF8;             //MY=1, MX=1, MV=1, ML=1, BGR=1
         break;
     }
+#ifdef USE_XOR
+    val ^= (_lcd_capable & (INVERT_GS | INVERT_SS | INVERT_RGB | FLIP_HORIZ | FLIP_VERT)); 
+    volatile uint8_t magic;
+    if (val & (FLIP_HORIZ | FLIP_VERT)) val ^= (INVERT_GS | INVERT_SS);
+    magic = (INVERT_GS | FLIP_VERT); if ((val & magic) == magic) val ^= magic;
+    magic = (INVERT_SS | FLIP_HORIZ); if ((val & magic) == magic) val ^= magic;
+    magic = (INVERT_RGB); if ((val & magic) != magic) val ^= magic;
+    if (_lcd_capable & MIPI_DCS_REV1) {
+        if (_lcd_ID == 0x6814) {  //.kbv my weird 0x9486 might be 68140
+            GS = (val & 0x80) ? (1 << 6) : 0;   //MY
+            SS = (val & 0x40) ? (1 << 5) : 0;   //MX
+            val &= 0x28;        //keep MV, BGR, MY=0, MX=0, ML=0
+            d[0] = 0;
+            d[1] = GS | SS | 0x02;      //MY, MX
+            d[2] = 0x3B;
+            WriteCmdParamN(0xB6, 3, d);
+        }
+        if (_lcd_ID == 0x1581) { // no Horizontal Flip
+            d[0] = (val & FLIP_HORIZ) ? 0x13 : 0x12; //REV | BGR | SS
+            WriteCmdParamN(0xC0, 1, d);
+        }
+        if (_lcd_ID == 0x1511) {
+            val &= ~0x10;   //remove ML
+            val |= 0xC0;    //force penguin 180 rotation
+        }
+        if (is8347) {
+            _MC = 0x02, _MP = 0x06, _MW = 0x22, _SC = 0x02, _EC = 0x04, _SP = 0x06, _EP = 0x08;
+			if (_lcd_ID == 0x5252) {
+			    val |= 0x02;   //VERT_SCROLLON
+				if (val & 0x10) val |= 0x04;   //if (ML) SS=1 kludge mirror in XXX_REV modes
+            }
+			goto common_BGR;
+        }
+        goto common_MC;
+#else
     if (_lcd_capable & INVERT_GS)
         val ^= 0x80;
     if (_lcd_capable & INVERT_SS)
@@ -382,6 +435,7 @@ void MCUFRIEND_kbv::setRotation(uint8_t r)
             }
 			goto common_BGR;
         }
+#endif
       common_MC:
         _MC = 0x2A, _MP = 0x2B, _MW = 0x2C, _SC = 0x2A, _EC = 0x2A, _SP = 0x2B, _EP = 0x2B;
       common_BGR:
@@ -1958,26 +2012,26 @@ case 0x4532:    // thanks Leodino
         }
         break;
     case 0x1581:
-        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_BGR | READ_24BITS; //thanks zdravke
+        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_BGR | READ_24BITS | FLIP_VERT | FLIP_HORIZ; //thanks zdravke
 		goto common_9481;
     case 0x8357:                //BIG CHANGE: HX8357-B is now 0x8357
-        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | REV_SCREEN;  // thanks pAy79
+        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | REV_SCREEN | FLIP_VERT | FLIP_HORIZ;  // thanks pAy79
 		goto common_9481;
     case 0x9481:
-        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_BGR;
+        _lcd_capable = AUTO_READINC | MIPI_DCS_REV1 | MV_AXIS | READ_BGR | FLIP_VERT | FLIP_HORIZ;
 	  common_9481:
         static const uint8_t ILI9481_regValues[] PROGMEM = {    // Atmel MaxTouch
             0xB0, 1, 0x00,              // unlocks E0, F0
-//            0xB3, 4, 0x02, 0x00, 0x00, 0x00, //Frame Memory, interface [02 00 00 00]
-//			0xB4, 1, 0x00,              // Frame mode [00]
+            0xB3, 4, 0x02, 0x00, 0x00, 0x00, //Frame Memory, interface [02 00 00 00]
+			0xB4, 1, 0x00,              // Frame mode [00]
 			0xD0, 3, 0x07, 0x42, 0x18,  // Set Power [00 43 18] x1.00, x6, x3
             0xD1, 3, 0x00, 0x07, 0x10,  // Set VCOM  [00 00 00] x0.72, x1.02
             0xD2, 2, 0x01, 0x02,        // Set Power for Normal Mode [01 22]
             0xD3, 2, 0x01, 0x02,        // Set Power for Partial Mode [01 22]
             0xD4, 2, 0x01, 0x02,        // Set Power for Idle Mode [01 22]
             0xC0, 5, 0x10, 0x3B, 0x00, 0x02, 0x11,      //Set Panel Driving [10 3B 00 02 11]
-//            0xC1, 3, 0x10, 0x10, 0x88,  // Display Timing Normal [10 10 88]
-//			0xC5, 1, 0x03,      //Frame Rate [03]
+            0xC1, 3, 0x10, 0x10, 0x88,  // Display Timing Normal [10 10 88]
+			0xC5, 1, 0x08,      //Frame Rate [03]
 //			0xC6, 1, 0x02,      //Interface Control [02]
             0xC8, 12, 0x00, 0x32, 0x36, 0x45, 0x06, 0x16, 0x37, 0x75, 0x77, 0x54, 0x0C, 0x00,
 //			0xCC, 1, 0x00,      //Panel Control [00]
@@ -2251,6 +2305,7 @@ case 0x4532:    // thanks Leodino
 #endif
     }
     _lcd_rev = ((_lcd_capable & REV_SCREEN) != 0);
+	_lcd_xor = _lcd_capable & 0xFF;
     if (table8_ads != NULL) {
         static const uint8_t reset_off[] PROGMEM = {
             0x01, 0,            //Soft Reset
