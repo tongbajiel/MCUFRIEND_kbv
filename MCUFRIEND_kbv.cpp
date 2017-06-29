@@ -779,6 +779,7 @@ void MCUFRIEND_kbv::invertDisplay(boolean i)
     case 0x0139:
 #endif
     case 0x0154:
+    case 0x9225:
         WriteCmdData(0x07, 0x13 | (_lcd_rev << 2));     //.kbv kludge
         break;
 #ifdef SUPPORT_1289
